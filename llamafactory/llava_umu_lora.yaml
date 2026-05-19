@@ -1,0 +1,54 @@
+### LLaVA-1.5-7B + CLEAR LoRA fine-tuning config
+### Run: CUDA_VISIBLE_DEVICES=0,1,2,3,5,6 llamafactory-cli train llamafactory/llava_clear_lora.yaml
+
+# Model
+model_name_or_path: weight/LLaVA-1.5-7B
+trust_remote_code: true
+
+# Training method
+stage: sft
+do_train: true
+finetuning_type: lora
+
+# Dataset
+dataset: umu_full
+dataset_dir: llamafactory
+media_dir: datasets/UMU/full_set/images
+template: llava
+cutoff_len: 2048
+
+# Image size
+image_max_pixels: 112896
+image_min_pixels: 112896
+
+# LoRA
+lora_target: all
+lora_rank: 32
+lora_alpha: 64
+lora_dropout: 0.05
+
+# Freeze vision components
+freeze_vision_tower: False
+freeze_multi_modal_projector: False
+
+# Training parameters
+output_dir: output/llava_umu_llamafactory_vision_true_16
+per_device_train_batch_size: 2
+gradient_accumulation_steps: 8
+learning_rate: 1.0e-4  
+num_train_epochs: 16
+lr_scheduler_type: cosine 
+warmup_ratio: 0.05
+
+# Optimizer
+optim: adamw_torch
+
+# Precision
+bf16: true
+
+# Logging and saving
+logging_steps: 5
+save_strategy: epoch
+save_total_limit: 2
+plot_loss: true
+overwrite_output_dir: true

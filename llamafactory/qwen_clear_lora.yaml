@@ -1,0 +1,54 @@
+### Qwen2.5-VL-3B + UMU LoRA fine-tuning config
+### Run: CUDA_VISIBLE_DEVICES=0,1,2,3,5,6 llamafactory-cli train llamafactory/qwen_umu_lora.yaml
+
+# Model
+model_name_or_path: weight/Qwen2.5-VL-3B
+trust_remote_code: true
+
+# Training method
+stage: sft
+do_train: true
+finetuning_type: lora
+
+# Dataset
+dataset: clear_full
+dataset_dir: llamafactory
+media_dir: datasets/CLEAR/full_plus_tofu/images
+template: qwen2_vl
+cutoff_len: 2048
+
+# Image size
+image_max_pixels: 262144
+image_min_pixels: 50176
+
+# LoRA
+lora_target: q_proj,k_proj,v_proj,o_proj,up_proj,gate_proj,down_proj
+lora_rank: 16
+lora_alpha: 32
+lora_dropout: 0.05
+
+# Freeze vision components
+freeze_vision_tower: false
+freeze_multi_modal_projector: false
+
+# Training parameters
+output_dir: outputs/qwen_clear_llamafactory
+per_device_train_batch_size: 2
+learning_rate: 1.0e-4
+num_train_epochs: 6
+lr_scheduler_type: cosine
+warmup_ratio: 0.03
+
+# Optimizer
+optim: adamw_torch
+
+# Precision
+bf16: true
+
+# Logging and saving
+logging_steps: 10
+save_strategy: epoch
+save_total_limit: 3
+plot_loss: true
+overwrite_output_dir: true
+preprocessing_num_workers: 1
