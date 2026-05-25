@@ -26,8 +26,8 @@ LSRA addresses these issues in three stages:
    original states. Only selected MLP `down_proj` weights are updated.
 
 <p align="center">
-  < img src="figure/framework.png" alt="Overview of LSRA" width="92%">
-</p >
+    <img src="figure/framework.png" alt="Overview of LSRA" width="92%">
+</p>
 
 ## Installation
 
