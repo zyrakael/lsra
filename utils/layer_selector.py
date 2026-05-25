@@ -31,11 +31,11 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 sys.path.insert(0, os.path.join(PROJECT_ROOT, "methods", "baselines"))
 
-from methods.baselines.load_data import (
+from methods.load_data import (
     load_forget_dataloaders,
     load_retain_dataloaders,
 )
-from methods.baselines.multilayer_rmu import (
+from methods.LSRA import (
     RandomTargetCache,
     build_answer_mask_for_multimodal,
     compute_activation_loss,
