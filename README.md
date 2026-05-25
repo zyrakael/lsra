@@ -45,14 +45,11 @@ CUDA 12.1. The core dependencies in our environment are:
 | LLaMA-Factory | 0.9.3 |
 | Safetensors | 0.4.4 |
 | NumPy | 1.26.4 |
-| Pillow | 10.4.0 |
-| scikit-learn | 1.5.2 |
 | Rouge | 1.0.1 |
 
 The LLaMA-Factory baseline configurations under `llamafactory/` require an
 installed [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory)
-environment. Other transitive or visualization dependencies can be installed
-as required by the corresponding evaluation and plotting scripts.
+environment.
 
 ## Quick Start
 
