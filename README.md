@@ -1,220 +1,129 @@
-<div align="center">
+# LSRA: A Layer-Selective Representation Alignment Framework for Unlearning in MLLMs
 
-# CRM: Coherent Representation Misdirection for Multimodal Unlearning
-
-<p>
-  <a href="#"><img src="https://img.shields.io/badge/Python-3.10%2B-blue.svg" alt="Python"></a>
-  <a href="#"><img src="https://img.shields.io/badge/PyTorch-2.1%2B-orange.svg" alt="PyTorch"></a>
-  <a href="#"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License"></a>
-  <a href="#"><img src="https://img.shields.io/badge/Paper-ACL%202026-red.svg" alt="Paper"></a>
-</p>
-
-<p><i>A representation-level framework for consistent and utility-preserving unlearning in multimodal large language models.</i></p>
-
-</div>
-
----
+LSRA is a multimodal machine unlearning framework that removes target
+knowledge consistently from both text-only and image-text inputs while
+preserving the utility of retained knowledge. It first selects layers that are
+effective for forgetting with limited retention degradation, then aligns
+hidden representations at the selected layers using forget and retain targets.
 
 ## Overview
 
-Multimodal Large Language Models (MLLMs) absorb sensitive or outdated knowledge during pretraining, and removing such knowledge without retraining is a critical challenge. **CRM (Coherent Representation Misdirection)** formulates MLLM unlearning as a *representation redirection* problem and addresses two key issues that existing methods struggle with:
+Multimodal large language models (MLLMs) can expose the same target knowledge
+through different input modalities. For example, a fact may still be recovered
+through a text-only query even after it has been removed from an image-text
+query. Unlearning updates can also damage unrelated retained knowledge.
 
-- **Cross-modal inconsistency.** Target knowledge can be accessed through *text-only* or *image-text* queries, but most methods only erase it from one side.
-- **Forgetting vs. utility trade-off.** Aggressive updates often hurt the model's general capabilities.
+LSRA addresses these issues in three stages:
 
-CRM tackles both with a two-stage design:
+1. **Layer selection.** Candidate layers are evaluated jointly on unimodal and
+   multimodal forget/retain data. A distance constraint encourages selected
+   layers to be distributed across the network depth.
+2. **Target construction.** Forget targets are extracted from a frozen
+   reference model using a shared random-token sequence. Retain targets are
+   reference-model representations of retain samples.
+3. **Representation alignment.** Forget representations are redirected toward
+   forget targets, while retain representations are regularized toward their
+   original states. Only selected MLP `down_proj` weights are updated.
 
-1. **Layer Selection** &nbsp;—&nbsp; Identifies layers that contribute strongly to forgetting while introducing minimal degradation to retention, using a *joint* unimodal + multimodal score and a *distance constraint* that disperses selected layers across depths.
-2. **Coherent Representation Misdirection** &nbsp;—&nbsp; On the selected layers, forget-sample activations are pushed toward **coherent targets** derived from a single forward pass of the original model on a shared random token sequence, while retain-sample activations are kept close to the original states. Only the **MLP down-projection** weights of selected layers are updated.
-
-<div align="center">
-  <img src="figure/framework.png" alt="CRM framework" width="92%">
-  <br>
-  <em>Figure 1. Overview of CRM. Stage 1 selects forgetting-critical layers; Stage 2 redirects forget representations toward coherent random targets while preserving retain representations.</em>
-</div>
-
----
-
-## Repository Structure
-
-```
-CRM/
-├── methods/                # Core CRM training code
-│   ├── CRM.py              # Main unlearning entry point (Stage 2)
-│   └── load_data.py        # Forget / retain dataloaders
-├── utils/                  # Helpers
-│   ├── layer_selector.py   # Stage 1: one-pass layer selection
-│   ├── model_utils.py      # Model loading, LoRA, hooks
-│   ├── layer_utils.py
-│   └── seed_utils.py
-├── eval/                   # Evaluation pipeline
-│   ├── run_eval.py         # Main evaluation entry point
-│   ├── evaluate.py         # FVQA / FVGEN / FQA / RVQA / RVGEN / RQA
-│   └── score_by_llm.py     # LLM-as-judge scoring
-├── metrics/                # ROUGE / BLEU / BERTScore / Accuracy / ...
-├── llamafactory/           # LLaMA-Factory configs for baseline fine-tuning
-├── figure/                 # Framework figure
-└── README.md
-```
-
----
+<p align="center">
+  < img src="figure/framework.png" alt="Overview of LSRA" width="92%">
+</p >
 
 ## Installation
 
-> **Note**: The package versions below are placeholders — please replace with the versions used in your environment once the server is back online.
+Our experiments were conducted with Python 3.10 and PyTorch built for
+CUDA 12.1. The core dependencies in our environment are:
 
-```bash
-git clone https://github.com/<your-org>/CRM-Unlearning.git
-cd CRM-Unlearning
+| Package | Version |
+| --- | --- |
+| Python | 3.10.4 |
+| PyTorch | 2.4.0+cu121 |
+| Transformers | 4.57.3 |
+| Accelerate | 1.7.0 |
+| PEFT | 0.15.2 |
+| Datasets | 2.21.0 |
+| LLaMA-Factory | 0.9.3 |
+| Safetensors | 0.4.4 |
+| NumPy | 1.26.4 |
+| Pillow | 10.4.0 |
+| scikit-learn | 1.5.2 |
+| Rouge | 1.0.1 |
 
-conda create -n crm python=3.10 -y
-conda activate crm
-
-pip install -r requirements.txt
-```
-
-<details>
-<summary><b>Main dependencies</b></summary>
-
-- `torch >= 2.1`
-- `transformers >= 4.45`
-- `accelerate`
-- `peft`
-- `datasets`
-- `Pillow`, `numpy`, `scikit-learn`, `tqdm`
-- `evaluate` (for ROUGE / BLEU / BERTScore)
-
-</details>
-
----
-
-## Data & Models
-
-### Datasets
-
-| Dataset | Modalities | Forget Ratios | Link |
-|---|---|---|---|
-| **UMU-Bench** | Text + Image-Text | 5% / 10% / 15% | [link](#) |
-| **CLEAR** | Text + Image-Text | 1% / 5% / 10% | [link](#) |
-
-After downloading, place the datasets under `./datasets/` (or pass `--data_dir` explicitly).
-
-### Pretrained MLLMs
-
-| Model | HF Hub |
-|---|---|
-| Qwen2.5-VL-3B-Instruct | [Qwen/Qwen2.5-VL-3B-Instruct](https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct) |
-| LLaVA-1.5-7B | [llava-hf/llava-1.5-7b-hf](https://huggingface.co/llava-hf/llava-1.5-7b-hf) |
-
----
+The LLaMA-Factory baseline configurations under `llamafactory/` require an
+installed [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory)
+environment. Other transitive or visualization dependencies can be installed
+as required by the corresponding evaluation and plotting scripts.
 
 ## Quick Start
 
-### Stage 1 — Layer Selection
+### 1. Layer Selection
 
-Rank all transformer layers by their joint forgetting / retention scores and dump a layer-ranking JSON.
+Run mini-training over candidate transformer layers, rank their
+forgetting-retention trade-off, and select dispersed layers:
 
 ```bash
 python utils/layer_selector.py \
-    --model LLaVA-1.5-7B \
-    --dataset clear \
+    --model Qwen2.5-VL-3B \
+    --dataset umu \
+    --data_dir ./datasets \
+    --forget_ratio 5 \
     --start_layer 0 \
-    --end_layer 31 \
+    --end_layer 35 \
     --num_steps 500 \
-    --learning_rate 1e-4
-```
+    --top_k 4 \
+    --min_gap 5 \
 
-Output: `outputs/layer_select/{dataset}_{model}/layer_ranking.json`
+``` 
 
-### Stage 2 — Coherent Representation Misdirection
+### 2. Representation Alignment for Unlearning
 
-Run unlearning on the layers selected in Stage 1 (here we use `0 9 14 19` as an example):
 
 ```bash
-python methods/CRM.py \
-    --model LLaVA-1.5-7B \
-    --dataset clear \
+python methods/LSRA.py \
+    --model Qwen2.5-VL-3B \
+    --dataset umu \
+    --data_dir ./datasets \
     --forget_ratio 5 \
-    --target_layers 0 9 14 19 \
+    --target_layers 0 9 15 22 \
+    --trainable_params_regex "model.language_model.layers.(0|9|15|22).mlp.down_proj.weight" \
     --loss_type cosine \
+    --random_seq_len 1024 \
+    --batch_size 2 \
     --num_epochs 9 \
     --learning_rate 1e-4 \
-    --gamma 1.0 \
-    --alpha 1.0 \
-    --random_seq_len 1024 \
-    --output_dir ./outputs/CRM
+    --model_device cuda:0 \
 ```
 
-### Evaluation
+
+
+### 3. Evaluation
+
+Evaluate a trained checkpoint as follows:
 
 ```bash
 python eval/run_eval.py \
-    --model LLaVA-1.5-7B \
-    --model_path ./outputs/CRM/<your-checkpoint-dir> \
-    --dataset clear \
-    --batch_size 1
+    --model Qwen2.5-VL-3B \
+    --model_path ./outputs/lsra/<checkpoint_dir> \
+    --dataset umu \
+    --base_path ./datasets \
+    --batch_size 1 \
+    --model_device cuda:0 \
+    --judge_device cuda:1
 ```
 
-The script reports **FVQA / FVGEN / FQA** (forget, ↓), **RVQA / RVGEN / RQA** (retain, ↑) and the overall **H-Mean** (↑).
-
----
-
-## Key Hyperparameters
-
-| Argument | Description | Default |
-|---|---|---|
-| `--target_layers` | Layer indices selected by Stage 1 | `0 9 14 19` |
-| `--random_seq_len` | Length of the shared random token sequence | `1024` |
-| `--loss_type` | `cosine` (recommended) or `mse` | `cosine` |
-| `--gamma` | Weight of the forget loss | `1.0` |
-| `--alpha` | Weight of the retain loss | `1.0` |
-| `--text_weight` / `--multimodal_weight` | Modality weights $w_t$ / $w_m$ | `1.0` / `1.0` |
-| `--learning_rate` | Learning rate | `1e-4` |
-| `--num_epochs` | Training epochs | `9` |
-
-Only the **MLP `down_proj`** weights of the selected layers are trainable, as controlled by `--trainable_params_regex`.
-
----
 
 ## Main Results
 
-Selected results from the paper (full table in Section 4.3):
+Results below are reported in the paper for LSRA. Lower forget-set metrics
+(`F*`) are better, while higher retain-set metrics (`R*`) and H-Mean are
+better.
 
-| Model | Method | FVQA ↓ | RVQA ↑ | FVGEN ↓ | RVGEN ↑ | FQA ↓ | RQA ↑ | **H-Mean ↑** |
-|---|---|---|---|---|---|---|---|---|
-| **Qwen2.5-VL-3B** | Vanilla | 72.00% | 62.84% | 0.6672 | 0.6716 | 76.00% | 72.21% | – |
-|  | MIP-Editor | 4.80% | 61.84% | 0.0997 | 0.6564 | 9.60% | 61.81% | 0.6306 |
-|  | **CRM (Ours)** | **1.33%** | **63.67%** | **0.0243** | 0.6065 | **2.00%** | **74.00%** | **0.6747** |
-| **LLaVA-1.5-7B** | Vanilla | 76.00% | 72.21% | 0.9900 | 0.9702 | 82.00% | 69.05% | – |
-|  | MIP-Editor | 38.40% | 67.87% | 0.3418 | 0.8308 | 36.80% | 63.80% | 0.5629 |
-|  | **CRM (Ours)** | **2.00%** | **74.82%** | **0.0075** | **0.9510** | **1.68%** | **69.79%** | **0.8070** |
+| Model | Dataset | FVQA | RVQA | FVGEN | RVGEN | FQA/FGEN | RQA/RGEN | H-Mean |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Qwen2.5-VL-3B-Instruct | UMU-Bench | 0.0133 | 0.6367 | 0.0243 | 0.6065 | 0.0200 | 0.7400 | 0.6747 |
+| Qwen2.5-VL-3B-Instruct | CLEAR | 0.1117 | 0.8734 | 0.1555 | 0.5034 | 0.0055 | 0.8804 | 0.6396 |
+| LLaVA-1.5-7B | UMU-Bench | 0.0200 | 0.7482 | 0.0075 | 0.9510 | 0.0168 | 0.6979 | 0.8070 |
+| LLaVA-1.5-7B | CLEAR | 0.0638 | 0.5189 | 0.0832 | 0.8623 | 0.0096 | 0.9758 | 0.6780 |
 
-CRM achieves consistent low forget scores across all modalities while preserving the highest retain performance.
-
----
-
-## Citation
-
-If you find this work useful, please consider citing:
-
-```bibtex
-@inproceedings{anonymous2026crm,
-  title     = {Coherent Representation Misdirection for Multimodal Unlearning},
-  author    = {Anonymous},
-  booktitle = {Proceedings of the 64th Annual Meeting of the Association for Computational Linguistics (ACL)},
-  year      = {2026}
-}
-```
-
----
-
-## Acknowledgements
-
-This work builds upon many great open-source projects, including
-[UMU-Bench](#), [CLEAR](#), [Qwen2.5-VL](https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct), [LLaVA](https://github.com/haotian-liu/LLaVA), [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory), and the HuggingFace `transformers` / `peft` / `accelerate` ecosystem.
-
----
-
-## License
-
-This project is released under the [MIT License](LICENSE).
+For UMU-Bench, the text-only columns correspond to FQA/RQA; for CLEAR, they
+correspond to FGEN/RGEN.
